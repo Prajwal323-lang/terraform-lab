@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     docker = {
-      source = "kreuzwerker/docker"
+      source  = "kreuzwerker/docker"
       version = "~> 3.0.2"
     }
   }
@@ -9,18 +9,46 @@ terraform {
 
 provider "docker" {}
 
-module "nginx1" {
+# Dynamic input
+variable "container_config" {
+  default = [
+    {
+      name = "web1"
+      port = 8081
+    },
+    {
+      name = "web2"
+      port = 8082
+    },
+    {
+      name = "web3"
+      port = 8083
+    }
+  ]
+}
+
+# Convert list → map for for_each
+locals {
+  container_map = {
+    for c in var.container_config :
+    c.name => c
+  }
+}
+
+# Dynamic module creation
+module "containers" {
+  for_each = local.container_map
+
   source = "./modules/nginx_container"
 
-  container_name = "nginx1"
-  container_port = 8081
+  container_name = each.value.name
+  container_port = each.value.port
   image_name     = "nginx:latest"
 }
 
-module "nginx2" {
-  source = "./modules/nginx_container"
-
-  container_name = "nginx2"
-  container_port = 8082
-  image_name     = "nginx:latest"
+output "container_urls" {
+  value = [
+    for c in var.container_config :
+    "http://localhost:${c.port}"
+  ]
 }
